@@ -1,0 +1,26 @@
+﻿--- tx.py ---
+  Launch power: 0.0 dBm  [expect 0.000]
+
+--- fiber.py ---
+  beta2: -2.167e-23 s^2/km  [expect -2.167e-23]
+  Power after 1 span + EDFA: 0.01 dBm  [expect ~0]
+
+--- rx.py: back-to-back BER ---
+  Back-to-back BER: 0.0   [expect 0.0]
+
+--- rx.py: fibre-impaired BER > 0 ---
+  BER after 400 km: 0.4819   [expect > 0]
+
+--- ml.py ---
+  Dataset X: (1018, 14)   Y: (1018, 2)
+  Model params: 5250 [expect 5250]
+  Training 815 samples  |  Validating 203 samples
+  Final train loss: 0.494848
+  Equalized symbols: 1018
+
+--- plots.py ---
+  All 4 figure functions OK
+
+=============================================
+  ALL TESTS PASSED
+=============================================

@@ -97,22 +97,23 @@ def ssfm_propagate(A: np.ndarray,
                           fiber_params['wavelength_nm'])          # s²/km
     gamma  = fiber_params['gamma_W_km']                          # W⁻¹ km⁻¹
 
-    N      = len(A)
-    dt     = 1.0 / fs                                            # s
-    omega  = 2.0 * np.pi * np.fft.fftfreq(N, d=dt)              # rad/s
+    # ── Fast FFT power-of-2 zero-padding to eliminate edge wrap-around and optimize SIMD FFT speed
+    N_orig = len(A)
+    N = 1 << (N_orig - 1).bit_length()
+    dt = 1.0 / fs                                                # s
+    omega = 2.0 * np.pi * np.fft.fftfreq(N, d=dt)                # rad/s
 
     # Adjust step count so steps divide span evenly
     n_steps = max(1, int(np.ceil(span_km / dz_km)))
     dz      = span_km / n_steps                                  # actual step [km]
 
     # ── Linear (dispersive + attenuative) transfer functions ──────────────────
-    # In the frequency domain: L̂(ω) = −α/2 − j(β₂/2)ω²
-    # Over half-step dz/2:  H_half = exp(L̂ · dz/2)
     exponent = (-alpha / 2.0 - 1j * beta2 / 2.0 * omega ** 2)
     H_half   = np.exp(exponent * (dz / 2.0))
     H_full   = H_half ** 2              # full-step = two half-steps
 
-    A_out = A.copy().astype(complex)
+    # Pad with zeros to power of 2
+    A_out = np.pad(A.astype(complex), (0, N - N_orig))
 
     # ── Propagation loop ──────────────────────────────────────────────────────
     # First half-linear step
@@ -120,17 +121,16 @@ def ssfm_propagate(A: np.ndarray,
 
     for step in range(n_steps):
         # Full nonlinear phase rotation (time domain)
-        # NL(Δz): A ← A · exp(jγ|A|²Δz)
         A_out *= np.exp(1j * gamma * np.abs(A_out) ** 2 * dz)
 
         if step < n_steps - 1:
-            # Full linear step for interior boundaries (two half-steps merged)
+            # Full linear step for interior boundaries
             A_out = np.fft.ifft(np.fft.fft(A_out) * H_full)
 
     # Final half-linear step
     A_out = np.fft.ifft(np.fft.fft(A_out) * H_half)
 
-    return A_out
+    return A_out[:N_orig]
 
 
 # ─── EDFA ─────────────────────────────────────────────────────────────────────
