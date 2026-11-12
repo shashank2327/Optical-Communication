@@ -59,10 +59,12 @@ def reconstruct_waveform(symbols: np.ndarray,
                          span: int = SPAN) -> np.ndarray:
     """
     Reconstruct a continuous-time waveform from discrete symbols by
-    upsampling and pulse-shaping with the RRC transmit filter.
+    upsampling and pulse-shaping with the full Raised Cosine filter
+    (RRC applied twice: Tx pulse shaping + Rx matched filter).
 
-    This generates a physically meaningful waveform from post-equalizer
-    symbols for genuine post-equalization eye diagrams.
+    The FD-CDC eye diagram path naturally passes through two RRC filters
+    (Tx RRC → channel → Rx matched filter RRC = Raised Cosine), so the
+    reconstruction must also apply two RRC filters for a fair comparison.
 
     Parameters
     ----------
@@ -78,10 +80,14 @@ def reconstruct_waveform(symbols: np.ndarray,
     Returns
     -------
     waveform : np.ndarray, complex
-        Reconstructed analog waveform at rate sps × Rs.
+        Reconstructed analog waveform at rate sps × Rs with Raised Cosine
+        pulse shape (zero ISI at symbol sampling instants).
     """
     h = rrc_taps(sps, rolloff, span)
-    return upfirdn(h, symbols, up=sps).astype(complex)
+    # 1st RRC: Tx pulse shaping (upsample + filter)
+    tx_shaped = upfirdn(h, symbols, up=sps).astype(complex)
+    # 2nd RRC: Rx matched filter (no resampling, just filter)
+    return upfirdn(h, tx_shaped, up=1, down=1).astype(complex)
 
 
 def calculate_evm(rx_symbols: np.ndarray, tx_symbols: np.ndarray) -> float:

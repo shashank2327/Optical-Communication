@@ -155,8 +155,8 @@ Optical-Communication-Links/
 ├── rx.py                  # Receiver: Matched filtering, deterministic timing, amplitude normalization
 ├── dsp.py                 # Conventional DSP: FD-CDC dispersion compensation, waveform reconstruction
 ├── ml.py                  # Neural network: Leakage-free dataset builder, MLP equalizer, FeatureScaler
-├── plots.py               # Visualizations: Eye diagrams, constellations, BER curves, training loss
-├── dashboard.py           # Streamlit dashboard: Real-time sliders, dual eye diagrams, metrics
+├── plots.py               # Visualizations: Constellations, 4-stage breakdown, BER curves, training loss
+├── dashboard.py           # Streamlit dashboard: Real-time sliders, constellation plots, metrics
 ├── generate_ber_curve.py  # Benchmark suite: Multi-burst training and evaluation sweeps
 ├── test_project.py        # Comprehensive automated test suite
 ├── test_stage1.py         # Physical model acceptance gates (A to G)

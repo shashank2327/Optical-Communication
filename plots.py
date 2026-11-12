@@ -84,7 +84,9 @@ def plot_eye_diagram(signal: np.ndarray,
 def plot_constellation(symbols_list: list[np.ndarray],
                        labels: list[str],
                        title: str = 'Constellation Diagram',
-                       max_points: int = 1200) -> plt.Figure:
+                       max_points: int = 1200,
+                       colours: list[str] | None = None,
+                       markers: list[str] | None = None) -> plt.Figure:
     """
     Scatter plot of symbol clouds on a shared, normalized IQ plane.
 
@@ -96,18 +98,25 @@ def plot_constellation(symbols_list: list[np.ndarray],
         Legend labels corresponding to symbols_list.
     title : str
     max_points : int
+    colours : list of str, optional
+        Custom color hex strings for each trace.
+    markers : list of str, optional
+        Custom marker symbols for each trace.
 
     Returns
     -------
     fig : matplotlib.figure.Figure
     """
-    colours = [_C_BLUE, _C_RED, _C_PURPLE, _C_ORANGE, _C_GREEN]
-    markers = ['o', 'x', '^', 'D', 's']
+    default_colours = [_C_BLUE, _C_RED, _C_PURPLE, _C_ORANGE, _C_GREEN]
+    default_markers = ['o', 'x', '^', 'D', 's']
     sizes   = [10,  6,   8,   7,   7]
+
+    use_cols = colours if colours is not None else default_colours
+    use_marks = markers if markers is not None else default_markers
 
     fig, ax = plt.subplots(figsize=(6, 6))
 
-    for syms, lbl, col, mk, sz in zip(symbols_list, labels, colours, markers, sizes):
+    for syms, lbl, col, mk, sz in zip(symbols_list, labels, use_cols, use_marks, sizes):
         n = min(len(syms), max_points)
         ax.scatter(syms[:n].real, syms[:n].imag,
                    s=sz, alpha=0.50, color=col, marker=mk, label=lbl)
@@ -145,6 +154,15 @@ def plot_constellation_grid(tx_syms: np.ndarray,
         (axes[1, 1], ml_syms, 'Neural Network Equalizer', _C_GREEN, 's'),
     ]
     for ax, syms, label, col, mk in panels:
+        if syms is None:
+            ax.text(0, 0, 'Equalizer Disabled / Unavailable',
+                    ha='center', va='center', fontsize=11, color=_C_GREY, fontstyle='italic')
+            ax.set_title(label, fontsize=11, fontweight='semibold')
+            ax.set_xlim(-1.8, 1.8)
+            ax.set_ylim(-1.8, 1.8)
+            ax.set_aspect('equal', adjustable='box')
+            ax.grid(True, linestyle='--', alpha=0.3)
+            continue
         n = min(len(syms), max_points)
         ax.scatter(syms[:n].real, syms[:n].imag, s=12, alpha=0.55, color=col, marker=mk)
         ax.axhline(0, color=_C_GREY, linewidth=0.8, linestyle='--')
@@ -170,7 +188,8 @@ def plot_ber_vs_distance(distances: np.ndarray,
                          bers_ml: np.ndarray | None = None,
                          fec_limit: float = 3.8e-3,
                          n_bits: int = 8172,
-                         title: str = 'Bit Error Rate vs Transmission Distance') -> plt.Figure:
+                         title: str = 'Bit Error Rate vs Transmission Distance',
+                         highlight_distance: float | None = None) -> plt.Figure:
     """
     Log-scale BER vs transmission distance comparing:
     - Baseline 1: No Equalization (Raw)
@@ -193,6 +212,8 @@ def plot_ber_vs_distance(distances: np.ndarray,
         Number of bits compared (determines statistical resolution limit 1/N).
     title : str
         Figure title.
+    highlight_distance : float or None
+        Current operating distance [km] to highlight with an indicator line.
 
     Returns
     -------
@@ -235,6 +256,11 @@ def plot_ber_vs_distance(distances: np.ndarray,
     ax.axhline(fec_limit, color='crimson', linestyle=':', linewidth=1.3,
                label=f'7% HD-FEC Limit ({fec_limit:.1e})')
 
+    # Current operating point visual indicator
+    if highlight_distance is not None:
+        ax.axvline(highlight_distance, color='#F59E0B', linestyle=':', linewidth=2.2, alpha=0.9,
+                   label=f'Current Link ({highlight_distance:.0f} km)')
+
     ax.set_xlabel('Transmission Distance  [km]', fontsize=11)
     ax.set_ylabel('Bit Error Rate (BER)', fontsize=11)
     ax.set_title(title, fontsize=13, fontweight='bold')
@@ -255,7 +281,8 @@ def plot_ber_vs_power(powers_dBm: np.ndarray,
                       distance_km: float = 400.0,
                       fec_limit: float = 3.8e-3,
                       n_bits: int = 8172,
-                      title: str | None = None) -> plt.Figure:
+                      title: str | None = None,
+                      highlight_power: float | None = None) -> plt.Figure:
     """
     Plot BER vs Optical Launch Power showing Kerr nonlinear penalty at high powers.
     Zero-error points are represented honestly with hollow markers at the resolution limit.
@@ -287,6 +314,11 @@ def plot_ber_vs_power(powers_dBm: np.ndarray,
     ax.axhline(fec_limit, color='crimson', linestyle=':', linewidth=1.3,
                label=f'7% HD-FEC Limit ({fec_limit:.1e})')
 
+    # Current operating point visual indicator
+    if highlight_power is not None:
+        ax.axvline(highlight_power, color='#F59E0B', linestyle=':', linewidth=2.2, alpha=0.9,
+                   label=f'Current Power ({highlight_power:+.1f} dBm)')
+
     ax.set_xlabel('Optical Launch Power  [dBm]', fontsize=11)
     ax.set_ylabel('Bit Error Rate (BER)', fontsize=11)
     if title is None:
@@ -305,7 +337,8 @@ def plot_evm_vs_distance(distances: np.ndarray,
                          evm_cdc: np.ndarray,
                          evm_ml: np.ndarray,
                          evm_raw: np.ndarray | None = None,
-                         title: str = 'Constellation EVM vs Transmission Distance') -> plt.Figure:
+                         title: str = 'Constellation EVM vs Transmission Distance',
+                         highlight_distance: float | None = None) -> plt.Figure:
     """
     Plot Error Vector Magnitude (EVM) vs distance, showing continuous analog signal quality.
     """
@@ -314,6 +347,11 @@ def plot_evm_vs_distance(distances: np.ndarray,
         ax.plot(distances, evm_raw, 'o--', color=_C_RED, linewidth=1.5, markersize=5, label='No Equalization (Raw)')
     ax.plot(distances, evm_cdc, '^-.', color=_C_PURPLE, linewidth=1.8, markersize=6, label='Linear FD-CDC (+ CPR)')
     ax.plot(distances, evm_ml, 's-', color=_C_GREEN, linewidth=2.2, markersize=6, label='Neural Network Equalizer (ML)')
+
+    if highlight_distance is not None:
+        ax.axvline(highlight_distance, color='#F59E0B', linestyle=':', linewidth=2.2, alpha=0.9,
+                   label=f'Current Link ({highlight_distance:.0f} km)')
+
     ax.set_xlabel('Transmission Distance  [km]', fontsize=11)
     ax.set_ylabel('Error Vector Magnitude (EVM)  [%]', fontsize=11)
     ax.set_title(title, fontsize=13, fontweight='bold')
@@ -327,13 +365,19 @@ def plot_evm_vs_power(powers_dBm: np.ndarray,
                       evm_cdc: np.ndarray,
                       evm_ml: np.ndarray,
                       distance_km: float = 400.0,
-                      title: str | None = None) -> plt.Figure:
+                      title: str | None = None,
+                      highlight_power: float | None = None) -> plt.Figure:
     """
     Plot EVM vs Optical Launch Power showing Kerr nonlinear variance reduction.
     """
     fig, ax = plt.subplots(figsize=(8.2, 4.8))
     ax.plot(powers_dBm, evm_cdc, '^-.', color=_C_PURPLE, linewidth=1.8, markersize=6, label='Linear FD-CDC (+ CPR)')
     ax.plot(powers_dBm, evm_ml, 's-', color=_C_GREEN, linewidth=2.2, markersize=6, label='Neural Network Equalizer (ML)')
+
+    if highlight_power is not None:
+        ax.axvline(highlight_power, color='#F59E0B', linestyle=':', linewidth=2.2, alpha=0.9,
+                   label=f'Current Power ({highlight_power:+.1f} dBm)')
+
     ax.set_xlabel('Optical Launch Power  [dBm]', fontsize=11)
     ax.set_ylabel('Error Vector Magnitude (EVM)  [%]', fontsize=11)
     if title is None:
@@ -347,31 +391,75 @@ def plot_evm_vs_power(powers_dBm: np.ndarray,
 
 # ─── Training Convergence Curve ───────────────────────────────────────────────
 
-def plot_training_curve(history: dict, title: str = 'Neural Network Training Curve') -> plt.Figure:
+def plot_training_curve(history: dict,
+                        title: str = 'Neural Network Training Curve',
+                        log_scale: bool = True) -> plt.Figure:
     """
     Plot training and validation MSE loss vs epoch along with baseline loss benchmarks.
+
+    Parameters
+    ----------
+    history : dict
+        Contains 'train_loss', 'val_loss', 'baseline_zero', 'baseline_identity'.
+    title : str
+        Figure title.
+    log_scale : bool
+        If True, use logarithmic Y-scale (semilogy) to expand the convergence region
+        and prevent high baseline values from squishing the loss curves.
     """
-    epochs = range(1, len(history['train_loss']) + 1)
-    fig, ax = plt.subplots(figsize=(7.5, 4.5))
+    epochs = list(range(1, len(history['train_loss']) + 1))
+    fig, ax = plt.subplots(figsize=(7.5, 4.6))
 
-    ax.plot(epochs, history['train_loss'],
-            color=_C_BLUE, linewidth=2.0, label='Train MSE')
-    ax.plot(epochs, history['val_loss'],
-            color=_C_ORANGE, linewidth=2.0, linestyle='--', label='Validation MSE')
+    if log_scale:
+        ax.semilogy(epochs, history['train_loss'],
+                    color=_C_BLUE, linewidth=2.0, label='Train MSE')
+        ax.semilogy(epochs, history['val_loss'],
+                    color=_C_ORANGE, linewidth=2.0, linestyle='--', label='Validation MSE')
+    else:
+        ax.plot(epochs, history['train_loss'],
+                color=_C_BLUE, linewidth=2.0, label='Train MSE')
+        ax.plot(epochs, history['val_loss'],
+                color=_C_ORANGE, linewidth=2.0, linestyle='--', label='Validation MSE')
 
-    if 'baseline_zero' in history:
-        ax.axhline(history['baseline_zero'], color=_C_GREY, linestyle=':',
-                   linewidth=1.2, label=f"Zero Predictor Baseline ({history['baseline_zero']:.3f})")
+    b_zero = history.get('baseline_zero')
+    b_ident = history.get('baseline_identity')
 
-    if 'baseline_identity' in history:
-        ax.axhline(history['baseline_identity'], color='#9333EA', linestyle='-.',
-                   linewidth=1.0, label=f"Identity Baseline ({history['baseline_identity']:.3f})")
+    if log_scale:
+        # In log scale, both baselines display cleanly without dominating the dynamic range
+        if b_zero is not None:
+            ax.axhline(b_zero, color=_C_GREY, linestyle=':',
+                       linewidth=1.2, label=f"Zero Predictor Baseline ({b_zero:.3f})")
+        if b_ident is not None:
+            ax.axhline(b_ident, color='#9333EA', linestyle='-.',
+                       linewidth=1.1, label=f"Identity Baseline ({b_ident:.3f})")
+        ax.set_ylabel('Mean Squared Error (MSE)  [Log Scale]', fontsize=11)
+        ax.grid(True, which='both', linestyle='--', alpha=0.35)
+    else:
+        # Linear scale: zoom in to max loss region so 0.497 doesn't flatten 90% of the graph
+        max_loss = max(max(history['train_loss']), max(history['val_loss']))
+        y_top = min(max_loss * 1.35, 0.08)
+
+        if b_ident is not None:
+            ax.axhline(b_ident, color='#9333EA', linestyle='-.',
+                       linewidth=1.1, label=f"Identity Baseline ({b_ident:.3f})")
+
+        if b_zero is not None:
+            if b_zero <= y_top:
+                ax.axhline(b_zero, color=_C_GREY, linestyle=':',
+                           linewidth=1.2, label=f"Zero Predictor Baseline ({b_zero:.3f})")
+            else:
+                # Add informative text annotation instead of stretching Y-axis
+                ax.text(0.98, 0.94, f"Zero Predictor Baseline: {b_zero:.3f} (off-scale)",
+                        transform=ax.transAxes, ha='right', va='top', fontsize=8.5,
+                        color=_C_GREY, bbox=dict(boxstyle='round,pad=0.2', facecolor='white', alpha=0.8, edgecolor=_C_GREY))
+
+        ax.set_ylim(bottom=0.0, top=y_top)
+        ax.set_ylabel('Mean Squared Error (MSE)  [Zoomed Linear]', fontsize=11)
+        ax.grid(True, linestyle='--', alpha=0.35)
 
     ax.set_xlabel('Epoch', fontsize=11)
-    ax.set_ylabel('Mean Squared Error (MSE)', fontsize=11)
     ax.set_title(title, fontsize=13, fontweight='bold')
-    ax.legend(fontsize=9)
-    ax.grid(True, linestyle='--', alpha=0.35)
+    ax.legend(fontsize=9, loc='center right' if log_scale else 'upper right')
     fig.tight_layout()
     return fig
 
